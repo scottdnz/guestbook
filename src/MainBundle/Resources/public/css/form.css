@@ -1,0 +1,30 @@
+/* CSS doc */
+
+.header {
+    background-color: #004626;
+    color: white;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 5px;
+    font-style: Verdana, Georgia;
+    margin-bottom: 0px;
+}
+
+.mainBody {
+    margin-top: 0px;
+    background-color: #E7F4EE;
+    margin-bottom: 20px;
+}
+
+.subheading {
+    background-color: #004626;
+    color: white;
+    font-weight: bold;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+}
+
+
+
+

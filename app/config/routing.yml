@@ -1,0 +1,12 @@
+main:
+    resource: "@MainBundle/Resources/config/routing.yml"
+    prefix:   /
+
+app:
+    resource: '@AppBundle/Controller/'
+    type: annotation
+    
+app_annotations:
+    # loads routes from the PHP annotations of the controllers found in that directory
+    resource: '@MainBundle/Controller/'
+    type:     annotation
