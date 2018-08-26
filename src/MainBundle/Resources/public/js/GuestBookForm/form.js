@@ -90,7 +90,7 @@ let fillVisitorsTable = function(visitors) {
     let rows = []; 
 
     for (let i=0; i< visitors.length; i++) {
-        let visitor = visitors[i];
+        let visitor = visitors[i];//JSON.parse(visitors[i]);
         let row = "<tr>";
         row += "<td>" + visitor["name"] + "</td>";
         row += "<td>" + visitor["address"] + "</td>";
@@ -108,16 +108,18 @@ let fillVisitorsTable = function(visitors) {
  * Makes a request to the back end to retrieve entries so far. The plan is to
  * make this paginating...
  */
-let fetchVisitors = function() {
+let fetchVisitors = function(paginationRequestURL) {
     $.ajax({
-        url: "/forms/guestbook/list",
+        url: paginationRequestURL,
         method: "GET",
         data: "",
         success: function( result ) {
-           fillVisitorsTable(result);
+           console.log(result);
+           fillVisitorsTable(result["rows"]);
         }
     });
 };
+
 
 $( document ).ready(function() {
     
@@ -125,9 +127,18 @@ $( document ).ready(function() {
         formGuestBook.handleSubmit();
     });
     
+    // Interaction with the php-paginator displays. Intercept & make an AJAX
+    // request to get paginated results.
+    $(".pagination li a").click(function(event) {
+        event.preventDefault();
+        let paginationRequestURL = $(this).attr("href");
+        fetchVisitors(paginationRequestURL);
+    });
+    
     const formGuestBook = new FormGuestBook(); 
     formGuestBook.initialize();
-    fetchVisitors();
+    let defaultPaginationRequestURL = "/entries/get/1";
+    fetchVisitors(defaultPaginationRequestURL);
     
 }); // End jQuery scope
 
