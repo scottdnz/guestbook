@@ -14,9 +14,16 @@ use MainBundle\Entity\Browser;
 use MainBundle\Entity\UserEnvironment;
 use MainBundle\Entity\Visitor;
 use MainBundle\Form\Type\VisitorType;
+use MainBundle\Form\Manipulators\GuestBookManipulator;
 require_once __DIR__ . "/../Lib/GuestBookFormHelpers.php";
+//require_once __DIR__ . "/../Form/Manipulators/GuestBookManipulator.php";
 
 class GuestBookController extends Controller {
+    private $manipulator;
+    
+    public function __construct() {
+        $this->manipulator = new GuestBookManipulator();
+    }
     
     /**
      * Displays the GuestBook form.
@@ -24,32 +31,17 @@ class GuestBookController extends Controller {
      * @Route("/forms/guestbook/display", name="formGuestBookDisplay", 
      * methods={"GET"}))
      */
-    public function guestBookDisplayAction(Request $request) {
-        // Set some default values for the form fields
-        $formEntity = new Visitor();
-        $formEntity->setName("name");
-        $formEntity->setAddress("address");
-        $formEntity->setEmail("email@test.com");
-        $formEntity->setMessage("message");
-        $form = $this->createForm(VisitorType::class, $formEntity);
+    public function guestBookDisplayAction(Request $request) { 
+        $this->manipulator->setDoctrineObject($this->getDoctrine());
+        $form = $this->createForm(VisitorType::class, 
+                $this->manipulator->getDefaultEntity());
         $form->handleRequest($request);
-        
-        $entityManager = $this->getDoctrine()->getManager();
-        // Paginating
-        $dql = "SELECT count(v.id) FROM MainBundle:Visitor v";
-        $totalItems = $entityManager->createQuery($dql)
-            ->getSingleScalarResult();
-        $itemsPerPage = 10;
-        $currentPage = 1;
-        $urlPattern = '/entries/get/(:num)';
-
-        $specialPaginator = new SpecialPaginator($totalItems, $itemsPerPage, $currentPage, $urlPattern);
 
         return $this->render(
             "@Main/GuestBookForm/FormDisplay.html.twig", 
             array(
                 "form" => $form->createView(),
-                "paginator"=> $specialPaginator
+                "paginator"=> $this->manipulator->getPaginatorForDisplay()
             )
         );
     }
@@ -61,44 +53,29 @@ class GuestBookController extends Controller {
      * methods={"POST"})
      */
     public function guestBookSubmitAction(Request $request) {
+        $this->manipulator->setDoctrineObject($this->getDoctrine());
         // Parse the JSON request
         $receivedVisitor = json_decode($request->getContent(), true);
-        $ipAddress = getenv('HTTP_CLIENT_IP')?:
-            getenv('HTTP_X_FORWARDED_FOR')?:
-            getenv('HTTP_X_FORWARDED')?:
-            getenv('HTTP_FORWARDED_FOR')?:
-            getenv('HTTP_FORWARDED')?:
-            getenv('REMOTE_ADDR');
+        $userEnv = $this->manipulator->getUserEnvironmentVariables();
         
         // Get these values from config parameters
         $secret = $this->getParameter("recaptcha_secret");
         $expectedHostName = $this->getParameter("host_name");
         $gRecaptchaResponse = $receivedVisitor["captcha"];
        
-        // Verify the Google ReCatpcha field value
+        // Verify the Google ReCaptcha field value
         $recaptcha = new \ReCaptcha\ReCaptcha($secret);
         $resp = $recaptcha->setExpectedHostname($expectedHostName)
-            ->verify($gRecaptchaResponse, $ipAddress);
-        $recaptchaRes = "";
+            ->verify($gRecaptchaResponse, 
+                    $userEnvs["receivedUserEnvironment"]->getIpAddress());
         if (! $resp->isSuccess()) {
             $errors = $resp->getErrorCodes();
             return new Reponse("Problem with captcha submission", 500);
         }
-  
-        // Use the php-browser-detector library to get info on the visitor
-        $browserDetected = new \Sinergi\BrowserDetector\Browser();
-        $platformDetected = new \Sinergi\BrowserDetector\Os();
-        $receivedBrowser = new \MainBundle\Entity\Browser();
-        $receivedBrowser->setName($browserDetected->getName());
-        $receivedBrowser->setVersion($browserDetected->getVersion());
-        
-        $receivedUserEnvironment = new UserEnvironment();
-        $receivedUserEnvironment->setIPAddress($ipAddress);
-        $receivedUserEnvironment->setPlatform($platformDetected->getName());
         
         $result = addRelatedEntries($this->getDoctrine(), 
-            $receivedVisitor, 
-            $receivedUserEnvironment, 
+            $userEnv["receivedVisitor"], 
+            $userenv["receivedUserEnvironment"], 
             $receivedBrowser);
         
         return new Response($result->getId());
@@ -112,9 +89,8 @@ class GuestBookController extends Controller {
      * methods={"GET"})
      */
     public function guestBookListAction() {
-        $visitors = $this->getDoctrine()
-            ->getRepository('MainBundle:Visitor')
-            ->findVisitorsJoin();
+        $this->manipulator->setDoctrineObject($this->getDoctrine());
+        $visitors = $this->manipulator->getPlainResults();
         return new JsonResponse($visitors);
     }
     
@@ -125,29 +101,9 @@ class GuestBookController extends Controller {
      * methods={"GET"}) 
      * @param Request $request
      */
-    public function entriesPaginationResultGet($startMultiplier) {         
-        $entityManager = $this->getDoctrine()->getManager();
-        $paginationAmount = 10;
-        $startIndex = ($startMultiplier - 1) * $paginationAmount;
-        $dql = "SELECT v, u FROM MainBundle:Visitor v JOIN v.userEnvironment u";
-        $query = $entityManager->createQuery($dql)
-            ->setFirstResult($startIndex)
-            ->setMaxResults($paginationAmount);
-        $paginator = new DoctrinePaginator($query, $fetchJoinCollection = true);
-
-        $rows = array();
-        foreach ($paginator as $pageRes) {
-            //Unpack
-            $row = array(
-                "Name"=> $pageRes->getName(),
-                "Address"=> $pageRes->getEmail(),
-                "Email"=> $pageRes->getAddress(),
-                "Message"=> $pageRes->getMessage(),
-                "IpAddress"=> $pageRes->getUserEnvironment()->getIPAddress(),
-                "Platform"=> $pageRes->getUserEnvironment()->getPlatform()
-            );
-            $rows[] = $row;
-        }
+    public function entriesPaginationResultGet($startMultiplier) {  
+        $this->manipulator->setDoctrineObject($this->getDoctrine());
+        $rows = $this->manipulator->getPaginatedResults($startMultiplier);
         return new JsonResponse($rows);
     }
 }

@@ -1,4 +1,5 @@
 <?php
+namespace MainBundle\Lib;
 
 use MainBundle\Entity\Browser;
 use MainBundle\Entity\UserEnvironment;
