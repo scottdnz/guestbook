@@ -90,14 +90,14 @@ let fillVisitorsTable = function(visitors) {
     let rows = []; 
 
     for (let i=0; i< visitors.length; i++) {
-        let visitor = visitors[i];//JSON.parse(visitors[i]);
+        let visitor = visitors[i];
         let row = "<tr>";
-        row += "<td>" + visitor["name"] + "</td>";
-        row += "<td>" + visitor["address"] + "</td>";
-        row += "<td>" + visitor["email"] + "</td>";
-        row += "<td>" + visitor["message"] + "</td>";
-        row += "<td>" + visitor["userEnvironment"]["iPAddress"] + "</td>";
-        row += "<td>" + visitor["userEnvironment"]["platform"] + "</td>";
+        row += "<td>" + visitor["Name"] + "</td>";
+        row += "<td>" + visitor["Address"] + "</td>";
+        row += "<td>" + visitor["Email"] + "</td>";
+        row += "<td>" + visitor["Message"] + "</td>";
+        row += "<td>" + visitor["IPAddress"] + "</td>";
+        row += "<td>" + visitor["Platform"] + "</td>";
         row += "</tr>";
         rows.push(row);
     }
@@ -115,7 +115,7 @@ let fetchVisitors = function(paginationRequestURL) {
         data: "",
         success: function( result ) {
            console.log(result);
-           fillVisitorsTable(result["rows"]);
+           fillVisitorsTable(result);//["rows"]);
         }
     });
 };
@@ -132,6 +132,19 @@ $( document ).ready(function() {
     $(".pagination li a").click(function(event) {
         event.preventDefault();
         let paginationRequestURL = $(this).attr("href");
+        
+        $(".pagination li").each(function() {
+           $(this).removeClass("active"); 
+        });
+        $(this).parent("li").addClass("active");
+        
+        let textOfPageButton = $(this).html();
+        // Disable these buttons for now as there's a problem with the PHP Paginator
+        // and Twig directives.
+        if (textOfPageButton.indexOf("Next") > -1 || 
+            textOfPageButton.indexOf("Previous") > -1) {
+            return false;
+        }
         fetchVisitors(paginationRequestURL);
     });
     
@@ -139,6 +152,14 @@ $( document ).ready(function() {
     formGuestBook.initialize();
     let defaultPaginationRequestURL = "/entries/get/1";
     fetchVisitors(defaultPaginationRequestURL);
+    
+    // Add this missing bit for the paginator
+    let $btnPrevious = $("<li><a id=\"btnPrevious\" href=\"\">&laquo; Previous </a></li>");
+    $btnPrevious.insertBefore("ul.pagination>li:first");
+    // Disable it since there's a Twig problem
+    $("#btnPrevious").click(function(event) {
+       event.preventDefault();
+    });
     
 }); // End jQuery scope
 

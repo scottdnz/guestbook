@@ -33,7 +33,7 @@
                     <label class="col-sm-2">Name</label>
                     <div class="col-sm-4">{{ form_widget(form.name) }}</div>
                 </div>
-                <br><br><br>
+                <br><br>
                  <div class="form-group">
                     <div>{{ form_errors(form.address) }}</div>
                     <label class="col-sm-2">Address</label>
@@ -73,17 +73,9 @@
                 
                 <div id="formGuestBookResultsArea"></div>
                 <br>
-                <button id="btnGetPaginatedResults">Get Paginated Results</button>
-                <br>
                 
-                <hr>
-                
-                {{ paginator|raw }}
-                <br>
-                <hr>
-                
-                <br>
                 <h4 class="subheading">GuestBook Entries</h6>
+                {{ paginator|raw }}
                 <table class="table">
                     <thead class="thead-dark">
                         <tr>

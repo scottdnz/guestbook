@@ -7,6 +7,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Doctrine\ORM\Tools\Pagination\Paginator as DoctrinePaginator;
+use Psr\Log\LoggerInterface;
 
 use JasonGrimes\Paginator as SpecialPaginator;
 use MainBundle\Entity\Browser;
@@ -14,7 +15,6 @@ use MainBundle\Entity\UserEnvironment;
 use MainBundle\Entity\Visitor;
 use MainBundle\Form\Type\VisitorType;
 require_once __DIR__ . "/../Lib/GuestBookFormHelpers.php";
-
 
 class GuestBookController extends Controller {
     
@@ -25,11 +25,12 @@ class GuestBookController extends Controller {
      * methods={"GET"}))
      */
     public function guestBookDisplayAction(Request $request) {
+        // Set some default values for the form fields
         $formEntity = new Visitor();
-        $formEntity->setName("n");
-        $formEntity->setAddress("a");
-        $formEntity->setEmail("e@h");
-        $formEntity->setMessage("m");
+        $formEntity->setName("name");
+        $formEntity->setAddress("address");
+        $formEntity->setEmail("email@test.com");
+        $formEntity->setMessage("message");
         $form = $this->createForm(VisitorType::class, $formEntity);
         $form->handleRequest($request);
         
@@ -60,6 +61,7 @@ class GuestBookController extends Controller {
      * methods={"POST"})
      */
     public function guestBookSubmitAction(Request $request) {
+        // Parse the JSON request
         $receivedVisitor = json_decode($request->getContent(), true);
         $ipAddress = getenv('HTTP_CLIENT_IP')?:
             getenv('HTTP_X_FORWARDED_FOR')?:
@@ -74,17 +76,14 @@ class GuestBookController extends Controller {
         $gRecaptchaResponse = $receivedVisitor["captcha"];
        
         // Verify the Google ReCatpcha field value
-//        $recaptcha = new \ReCaptcha\ReCaptcha($secret);
-//        $resp = $recaptcha->setExpectedHostname($expectedHostName)
-//                          ->verify($gRecaptchaResponse, $ipAddress);
-//        $recaptchaRes = "";
-//        if ($resp->isSuccess()) {
-//            // Verified!
-//            $recaptchaRes = "ok";
-//        } else {
-//            $errors = $resp->getErrorCodes();
-//            return new Reponse("Problem with captcha submission", 500);
-//        }
+        $recaptcha = new \ReCaptcha\ReCaptcha($secret);
+        $resp = $recaptcha->setExpectedHostname($expectedHostName)
+            ->verify($gRecaptchaResponse, $ipAddress);
+        $recaptchaRes = "";
+        if (! $resp->isSuccess()) {
+            $errors = $resp->getErrorCodes();
+            return new Reponse("Problem with captcha submission", 500);
+        }
   
         // Use the php-browser-detector library to get info on the visitor
         $browserDetected = new \Sinergi\BrowserDetector\Browser();
@@ -94,7 +93,6 @@ class GuestBookController extends Controller {
         $receivedBrowser->setVersion($browserDetected->getVersion());
         
         $receivedUserEnvironment = new UserEnvironment();
-        
         $receivedUserEnvironment->setIPAddress($ipAddress);
         $receivedUserEnvironment->setPlatform($platformDetected->getName());
         
@@ -115,8 +113,8 @@ class GuestBookController extends Controller {
      */
     public function guestBookListAction() {
         $visitors = $this->getDoctrine()
-                ->getRepository('MainBundle:Visitor')
-                ->findVisitorsJoin();
+            ->getRepository('MainBundle:Visitor')
+            ->findVisitorsJoin();
         return new JsonResponse($visitors);
     }
     
@@ -127,27 +125,29 @@ class GuestBookController extends Controller {
      * methods={"GET"}) 
      * @param Request $request
      */
-    public function entriesPaginationResultGet($startMultiplier) {
+    public function entriesPaginationResultGet($startMultiplier) {         
         $entityManager = $this->getDoctrine()->getManager();
         $paginationAmount = 10;
         $startIndex = ($startMultiplier - 1) * $paginationAmount;
         $dql = "SELECT v, u FROM MainBundle:Visitor v JOIN v.userEnvironment u";
         $query = $entityManager->createQuery($dql)
-                       ->setFirstResult($startIndex)
-                       ->setMaxResults($paginationAmount);
+            ->setFirstResult($startIndex)
+            ->setMaxResults($paginationAmount);
         $paginator = new DoctrinePaginator($query, $fetchJoinCollection = true);
 
-        $c = count($paginator);
-        
         $rows = array();
         foreach ($paginator as $pageRes) {
-
-              $rows[] = $pageRes
+            //Unpack
+            $row = array(
+                "Name"=> $pageRes->getName(),
+                "Address"=> $pageRes->getEmail(),
+                "Email"=> $pageRes->getAddress(),
+                "Message"=> $pageRes->getMessage(),
+                "IpAddress"=> $pageRes->getUserEnvironment()->getIPAddress(),
+                "Platform"=> $pageRes->getUserEnvironment()->getPlatform()
+            );
+            $rows[] = $row;
         }
-        
-        $data = array("count"=> $c,
-            "rows"=> $rows 
-        );
-        return new JsonResponse($data);
+        return new JsonResponse($rows);
     }
 }
